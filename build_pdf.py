@@ -1,7 +1,6 @@
 """Render RANSAC_Tutorial.md to a print-ready PDF (WeasyPrint has no JS,
 so Mermaid diagrams are pre-rendered with Graphviz and the six display-math
 expressions are written out as HTML)."""
-import base64
 import pathlib
 import re
 
@@ -9,39 +8,15 @@ import markdown
 from pygments.formatters import HtmlFormatter
 from weasyprint import HTML
 
-SRC = pathlib.Path("/home/claude/RANSAC_Tutorial.md")
-PNG = pathlib.Path("/home/claude/ransac_figures.png")
-OUT = pathlib.Path("/mnt/user-data/outputs/RANSAC_Tutorial.pdf")
+from common import DIAGRAM_ORDER, MATH, figure_data_uri, load_diagram
+
+HERE = pathlib.Path(__file__).resolve().parent   # works from any folder, any OS
+SRC = HERE / "RANSAC_Tutorial.md"
+PNG = HERE / "ransac_figures.png"
+OUT = HERE / "RANSAC_Tutorial.pdf"
 
 text = SRC.read_text(encoding="utf-8")
 
-
-def frac(num, den):
-    return (f'<span class="frac"><span class="num">{num}</span>'
-            f'<span class="den">{den}</span></span>')
-
-
-# ---- the six display-math expressions, in document order --------------------
-MATH = [
-    'P(sample is all-inlier) &nbsp;=&nbsp; <i>w</i><sup>s</sup>',
-
-    '1 − (1 − <i>w</i><sup>s</sup>)<sup>N</sup> &nbsp;≥&nbsp; <i>p</i>'
-    '&nbsp;&nbsp;&nbsp;⟺&nbsp;&nbsp;&nbsp;'
-    '(1 − <i>w</i><sup>s</sup>)<sup>N</sup> &nbsp;≤&nbsp; 1 − <i>p</i>',
-
-    '<span class="boxed"><i>N</i> &nbsp;≥&nbsp; '
-    + frac('log(1 − <i>p</i>)', 'log(1 − <i>w</i><sup>s</sup>)') + '</span>',
-
-    'P(clean) &nbsp;=&nbsp; ' + frac('C(<i>I</i>, <i>s</i>)', 'C(<i>n</i>, <i>s</i>)')
-    + ' &nbsp;=&nbsp; <span class="bigop">∏</span><sub class="lim">j=0</sub>'
-      '<sup class="lim">s−1</sup> ' + frac('<i>I</i> − <i>j</i>', '<i>n</i> − <i>j</i>'),
-
-    frac('P(clean)', '<i>w</i><sup>s</sup>') + ' &nbsp;≈&nbsp; 1 − '
-    + frac('<i>s</i>(<i>s</i> − 1)(1 − <i>w</i>)', '2 <i>w n</i>'),
-
-    'Cost &nbsp;=&nbsp; <i>N</i> ( C<sub>solve</sub> + <i>n</i> C<sub>residual</sub> )'
-    ' &nbsp;+&nbsp; C<sub>polish</sub>',
-]
 
 vault = {}
 
@@ -56,8 +31,7 @@ def stash(html):
 text = text.replace(
     "![Figure 1 — RANSAC: what it does, how long it takes, and how to tune it]"
     "(ransac_figures.png)",
-    stash('<div class="fig"><img src="data:image/png;base64,'
-          + base64.b64encode(PNG.read_bytes()).decode() + '"></div>'),
+    stash(f'<div class="fig"><img src="{figure_data_uri(PNG)}"></div>'),
 )
 text = text.replace(
     "Figure 1\nships alongside this document as\n`ransac_figures.png`, and §4.4 contains "
@@ -66,30 +40,18 @@ text = text.replace(
 )
 
 # mermaid -> pre-rendered Graphviz SVG, in document order
-svgs = ["loop", "pipeline", "taxonomy"]
-_i = [0]
-
-
-def _mm(m):
-    name = svgs[_i[0]]
-    _i[0] += 1
-    svg = pathlib.Path(f"/home/claude/dia_{name}.svg").read_text()
-    return stash(f'<div class="dia dia-{name}">{svg}</div>')
-
-
-text = re.sub(r"```mermaid\n.*?\n```", _mm, text, flags=re.S)
+_d = iter(DIAGRAM_ORDER)
+text = re.sub(
+    r"```mermaid\n.*?\n```",
+    lambda m: (lambda n: stash(f'<div class="dia dia-{n}">{load_diagram(n)}</div>'))(next(_d)),
+    text, flags=re.S,
+)
 
 # display math -> hand-written HTML, in document order
-_j = [0]
-
-
-def _math(m):
-    h = MATH[_j[0]]
-    _j[0] += 1
-    return stash(f'<div class="math">{h}</div>')
-
-
-text = re.sub(r"\$\$.+?\$\$", _math, text, flags=re.S)
+_m = iter(MATH)
+text = re.sub(r"\$\$.+?\$\$",
+              lambda m: stash(f'<div class="math">{next(_m)}</div>'),
+              text, flags=re.S)
 text = text.replace("<details>", '<details markdown="1" open>')
 
 body = markdown.markdown(
@@ -182,6 +144,6 @@ html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 {HtmlFormatter(style="friendly").get_style_defs(".codehilite")}</style>
 </head><body>{body}</body></html>"""
 
-pathlib.Path("/home/claude/_print.html").write_text(html, encoding="utf-8")
-HTML(string=html, base_url="/home/claude/").write_pdf(str(OUT))
+(HERE / "_print.html").write_text(html, encoding="utf-8")
+HTML(string=html, base_url=str(HERE)).write_pdf(str(OUT))
 print("wrote", OUT, OUT.stat().st_size // 1024, "KB")

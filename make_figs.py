@@ -1,8 +1,12 @@
 import math
+import pathlib
+
 import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+
+HERE = pathlib.Path(__file__).resolve().parent   # works from any folder, any OS
 from matplotlib.lines import Line2D
 
 plt.rcParams.update({
@@ -202,7 +206,7 @@ h2, l2 = axb.get_legend_handles_labels()
 ax.legend(h1 + h2, l1 + l2, loc="center right", fontsize=8)
 
 fig.tight_layout(rect=[0, 0, 1, 0.955])
-fig.savefig("/home/claude/ransac_figures.png", dpi=170)
+fig.savefig(str(HERE / "ransac_figures.png"), dpi=170)
 print("saved")
 print("RANSAC slope", r_slope, "OLS slope", o_slope, "trials", len(trace),
       "inliers", int(mask.sum()))

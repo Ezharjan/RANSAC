@@ -1,23 +1,31 @@
-"""Render RANSAC_Tutorial.md into one self-contained, theme-aware HTML page."""
-import base64
+"""Render RANSAC_Tutorial.md into one self-contained, theme-aware HTML page.
+
+Output is index.html, with the figure, the three flowcharts and all maths
+embedded inline. It has no external dependencies at all, so it works offline
+and on GitHub Pages without any CDN.
+
+Prerequisites:  python diagrams.py   (once, to produce dia_*.svg)
+"""
 import pathlib
 import re
 
 import markdown
 
-SRC = pathlib.Path("/home/claude/RANSAC_Tutorial.md")
-PNG = pathlib.Path("/home/claude/ransac_figures.png")
-OUT = pathlib.Path("/mnt/user-data/outputs/RANSAC_Tutorial.html")
+from common import DIAGRAM_ORDER, MATH, MATH_CSS, figure_data_uri, load_diagram
+
+HERE = pathlib.Path(__file__).resolve().parent   # works from any folder, any OS
+SRC = HERE / "RANSAC_Tutorial.md"
+PNG = HERE / "ransac_figures.png"
+OUT = HERE / "index.html"        # named for GitHub Pages; rename freely
 
 text = SRC.read_text()
 
 # ------------------------------------------------------------------ figure
-png_b64 = base64.b64encode(PNG.read_bytes()).decode()
 text = text.replace(
     "![Figure 1 — RANSAC: what it does, how long it takes, and how to tune it]"
     "(ransac_figures.png)",
-    f'<p class="fig"><img alt="Figure 1 — RANSAC: what it does, how long it '
-    f'takes, and how to tune it" src="data:image/png;base64,{png_b64}"></p>',
+    '<p class="fig"><img alt="Figure 1 — RANSAC: what it does, how long it '
+    f'takes, and how to tune it" src="{figure_data_uri(PNG)}"></p>',
 )
 text = text.replace(
     "Figure 1 ships alongside this document as\n`ransac_figures.png`, and §4.4 "
@@ -35,21 +43,20 @@ def stash(html: str) -> str:
     return key
 
 
-# mermaid fences -> <pre class="mermaid">, rendered natively by the host
-def _mermaid(m):
-    body = (m.group(1).replace("&", "&amp;")
-                      .replace("<", "&lt;")
-                      .replace(">", "&gt;"))
-    return stash(f'<pre class="mermaid">{body}</pre>')
+# mermaid fences -> the Graphviz SVGs from diagrams.py.
+# (A <pre class="mermaid"> block would stay raw text on GitHub Pages.)
+_d = iter(DIAGRAM_ORDER)
+text = re.sub(
+    r"```mermaid\n.*?\n```",
+    lambda m: (lambda n: stash(f'<div class="dia dia-{n}">{load_diagram(n)}</div>'))(next(_d)),
+    text, flags=re.S,
+)
 
-
-text = re.sub(r"```mermaid\n(.*?)\n```", _mermaid, text, flags=re.S)
-
-# display and inline math, kept away from the markdown processor
-text = re.sub(r"\$\$(.+?)\$\$",
-              lambda m: stash(f"\\[{m.group(1)}\\]"), text, flags=re.S)
-text = re.sub(r"(?<![\w$])\$([^$\n]+?)\$(?![\w$])",
-              lambda m: stash(f"\\({m.group(1)}\\)"), text)
+# $$...$$ -> plain HTML from common.MATH, so no maths CDN is needed
+_m = iter(MATH)
+text = re.sub(r"\$\$.+?\$\$",
+              lambda m: stash(f'<div class="math">{next(_m)}</div>'),
+              text, flags=re.S)
 
 # let the solutions block contain markdown
 text = text.replace("<details>", '<details markdown="1">')
@@ -169,10 +176,21 @@ td code,th code{white-space:normal}
          border:1px solid var(--rule); border-radius:8px;
          background:#fff; box-shadow:var(--shadow)}
 
-pre.mermaid{
-  background:var(--surface); border:1px solid var(--rule); text-align:center;
-  padding:1.1rem .6rem; overflow-x:auto;
+.dia{
+  margin:1.6rem 0; text-align:center; overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
 }
+.dia svg{max-width:100%; height:auto}
+/* the taxonomy chart is very wide: let it scroll rather than shrink to nothing */
+.dia-taxonomy{padding-bottom:.4rem}
+.dia-taxonomy svg{max-width:none; min-width:900px}
+@media (min-width:1100px){ .dia-taxonomy svg{min-width:0; max-width:100%} }
+/* Graphviz emits black strokes/text; retint them for dark mode */
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .dia svg text{fill:#e6e3de}
+  :root:not([data-theme="light"]) .dia{background:#f7f6f3; border-radius:8px; padding:.7rem 0}
+}
+:root[data-theme="dark"] .dia{background:#f7f6f3; border-radius:8px; padding:.7rem 0}
 
 details{
   margin:1.5rem 0; padding:.85rem 1.15rem; background:var(--surface-2);
@@ -188,8 +206,8 @@ div[align=center]{
   border:1px solid var(--rule); border-radius:10px;
 }
 div[align=center] h3{margin-top:0}
-mjx-container[display]{overflow-x:auto; overflow-y:hidden; max-width:100%}
 """
+CSS += MATH_CSS
 
 HTML = f"""<!DOCTYPE html>
 <html lang="en">
@@ -206,14 +224,6 @@ li.task{{list-style:none; margin-left:-1.1rem}}
 }}
 {pyg_dark_attr}
 </style>
-<script>
-window.MathJax = {{
-  tex: {{ inlineMath: [['\\\\(','\\\\)']], displayMath: [['\\\\[','\\\\]']] }},
-  options: {{ skipHtmlTags: ['script','noscript','style','textarea','pre','code'] }},
-  svg: {{ fontCache: 'global' }}
-}};
-</script>
-<script defer src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-svg.js"></script>
 </head>
 <body>
 <main class="wrap">
@@ -233,7 +243,7 @@ document.querySelectorAll('table').forEach(function (t) {{
 
 OUT.write_text(HTML)
 print("wrote", OUT, OUT.stat().st_size // 1024, "KB")
-print("mermaid blocks:", HTML.count('class="mermaid"'))
+print("diagrams embedded:", HTML.count('class="dia '))
 print("tables:", HTML.count("<table>"))
-print("math blocks:", HTML.count("\\[") + HTML.count("\\("))
+print("maths blocks:", HTML.count('class="math"'))
 print("unresolved placeholders:", HTML.count("@@VAULT"))

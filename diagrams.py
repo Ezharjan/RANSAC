@@ -1,6 +1,8 @@
 """Render the three tutorial flowcharts to SVG with Graphviz (for the PDF build)."""
 import subprocess, pathlib
 
+HERE = pathlib.Path(__file__).resolve().parent   # works from any folder, any OS
+
 BLUE, GREEN, RED, PURPLE = "#1f6fb2", "#0b8a3d", "#cc3311", "#8a5fb0"
 BLUE_F, GREEN_F, RED_F, PURPLE_F = "#e8f0f8", "#eaf5ec", "#fdeeea", "#f4eef8"
 
@@ -108,7 +110,7 @@ digraph taxonomy {{
 
 
 def render(dot_src, name):
-    out = pathlib.Path(f"/home/claude/dia_{name}.svg")
+    out = HERE / f"dia_{name}.svg"
     r = subprocess.run(["dot", "-Tsvg"], input=dot_src, capture_output=True, text=True)
     if r.returncode != 0:
         raise RuntimeError(r.stderr)

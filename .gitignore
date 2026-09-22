@@ -1,0 +1,26 @@
+# ---- build intermediates -------------------------------------------------
+# Written by build_pdf.py on its way to the PDF; not needed in the repo.
+_print.html
+
+# Keep these tracked on purpose, so a clone can rebuild index.html
+# without needing Graphviz installed:
+#   dia_loop.svg  dia_pipeline.svg  dia_taxonomy.svg
+
+# ---- Python --------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.ipynb_checkpoints/
+
+# ---- editors / IDEs ------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+
+# ---- operating systems ---------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini

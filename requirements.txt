@@ -1,0 +1,19 @@
+# Build the documents from RANSAC_Tutorial.md
+markdown>=3.4          # markdown -> HTML
+pygments>=2.14         # syntax highlighting in code blocks
+
+# Run the RANSAC code and regenerate Figure 1
+numpy>=1.24
+matplotlib>=3.6
+
+# PDF output only (build_pdf.py).
+# Needs GTK/Pango/Cairo system libraries -- see "Platform notes" in README.md.
+# Skip it and print index.html from your browser if you prefer.
+weasyprint>=60
+
+# Also required, but installed outside pip:
+#   Graphviz  -- the `dot` command, used by diagrams.py
+#                https://graphviz.org/download/
+#
+# Optional, only to try the Part V library examples yourself:
+#   scikit-learn  scikit-image  opencv-python  scipy

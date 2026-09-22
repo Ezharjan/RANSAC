@@ -7,7 +7,7 @@ of the art.
 Every code block in the tutorial was executed before publication, every number in every table was
 computed rather than recalled, and every reference was checked against its primary source.
 
-📖 **Read it online:** `https://ezharjan.github.io/RANSAC/`
+📖 **Read it online:** `[https://ezharjan.github.io/RANSAC/](https://ezharjan.github.io/RANSAC/)`
 
 ---
 

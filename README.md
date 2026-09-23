@@ -30,7 +30,7 @@ computed rather than recalled, and every reference was checked against its prima
 | Format | File | Best for |
 |---|---|---|
 | **Web page** | `index.html` | Reading on screen. Self-contained — double-click to open, no internet needed. Adapts to light/dark mode. This is what GitHub Pages serves. |
-| **PDF** | `RANSAC_Tutorial.pdf` | Printing, annotating, offline reading. 44 pages, A4. |
+| **PDF** | `RANSAC_Tutorial.pdf` | Printing, annotating, offline reading. 46 pages, A4. |
 | **Markdown** | `RANSAC_Tutorial.md` | Editing the text, or reading directly in GitHub's file browser. |
 
 All three contain identical content. `RANSAC_Tutorial.md` is the single source of truth — the
@@ -44,11 +44,11 @@ other two are generated from it.
 
 | File | Size | Description |
 |---|---|---|
-| `index.html` | ~740 KB | The tutorial as a web page. |
-| `RANSAC_Tutorial.pdf` | ~730 KB | The tutorial as a 44-page print document. |
-| `RANSAC_Tutorial.md` | ~100 KB | **The source text.** Edit this, then rebuild. |
+| `index.html` | ~760 KB | The tutorial as a web page. |
+| `RANSAC_Tutorial.pdf` | ~750 KB | The tutorial as a 46-page print document. |
+| `RANSAC_Tutorial.md` | ~105 KB | **The source text.** Edit this, then rebuild. |
 | `ransac_figures.png` | ~375 KB | Figure 1 — the four-panel summary of RANSAC's behaviour. |
-| `dia_loop.svg`<br>`dia_pipeline.svg`<br>`dia_taxonomy.svg` | ~38 KB total | The three flowcharts, rendered by Graphviz. Committed so the page can be rebuilt without installing Graphviz. |
+| `dia_loop.svg`<br>`dia_pipeline.svg`<br>`dia_taxonomy.svg` | ~39 KB total | The three flowcharts, rendered by Graphviz. Committed so the page can be rebuilt without installing Graphviz. |
 
 ### Code — what you run
 
@@ -120,16 +120,22 @@ the recovered parameters beside the ground truth:
 
 ```text
 LINE [ransac] slope=+0.5982 (true +0.6000)  intercept=-4.0139 (true -4.0000)  trials= 10
-              inliers=123  precision=0.976  recall=1.000  sigma_hat=0.229
+              inliers=123  precision=0.976  recall=1.000  sigma_hat=0.349
+LINE [msac  ] slope=+0.5982 (true +0.6000)  intercept=-4.0139 (true -4.0000)  trials= 10
+              inliers=123  precision=0.976  recall=1.000  sigma_hat=0.349
 LINE [OLS   ] slope=+0.3192 (true +0.6000)  intercept=-2.8339 (true -4.0000)
               <-- destroyed by outliers
-CIRCLE        centre=(+2.996,-1.981) r=5.000  (true (+3.0,-2.0) r=5.0)  trials=36  inliers=103
+
+CIRCLE        centre=(+2.996,-1.981) r=5.000  (true (+3.0,-2.0) r=5.0)
+              trials=36   inliers=103
+
 PLANE         normal=[0.186 -0.281 0.942] d=-1.502  (true [0.188 -0.282 0.941] d=-1.500)
-              angle_err=0.147 deg  trials=65  inliers=124
+              angle_err=0.147 deg   trials=65   inliers=124
 ```
 
 Those numbers are deterministic — the demo seeds its random generators, so you should see exactly
-this output. See [the API section](#using-the-ransac-engine-in-your-own-code) for how to use it on
+this output. (`sigma_hat` is the robust scale of the *perpendicular* residuals: the noise was added
+vertically with σ = 0.4, which is 0.4/√1.36 ≈ 0.34 perpendicular to a line of slope 0.6.) See [the API section](#using-the-ransac-engine-in-your-own-code) for how to use it on
 your own data.
 
 ---
@@ -203,23 +209,17 @@ plain HTML, so the result has **no external dependencies at all** — it works o
 On success it prints a self-check worth glancing at:
 
 ```text
-wrote .../index.html 750 KB
+wrote .../index.html 757 KB
 diagrams embedded: 3
 tables: 36
 maths blocks: 6
 unresolved placeholders: 0      <-- must be 0
 ```
 
-> **⚠️ Running this will overwrite your current `index.html`, and the diagrams will change.**
->
-> The `index.html` you deployed came from an earlier version of this script, which emitted
-> `<pre class="mermaid">` blocks and relied on the page host to draw them. GitHub Pages has no
-> Mermaid renderer, so on your live site those three flowcharts are very likely showing as raw
-> `flowchart TD / A[...] --> B[...]` text. Worth checking §3.3, §7.3 and §9 of the deployed page.
->
-> This version fixes that by embedding the Graphviz SVGs directly, so no renderer is needed
-> anywhere. If you would rather keep your current file exactly as it is, simply don't run this
-> script — nothing else in the repository touches `index.html`.
+> **Note:** earlier builds of `index.html` emitted `<pre class="mermaid">` blocks and loaded
+> MathJax from a CDN. GitHub Pages has no Mermaid renderer, so those flowcharts showed as raw
+> `flowchart TD …` text. The committed `index.html` is now built by this script: the Graphviz
+> SVGs and the mathematics are embedded directly, so nothing needs to be rendered or downloaded.
 
 ---
 
@@ -232,7 +232,7 @@ python build_pdf.py
 | | |
 |---|---|
 | **Reads** | `RANSAC_Tutorial.md`, `ransac_figures.png`, `dia_*.svg`, `common.py` |
-| **Writes** | `RANSAC_Tutorial.pdf` (overwrites), `_print.html` (intermediate, git-ignored) |
+| **Writes** | `RANSAC_Tutorial.pdf` (overwrites) — nothing else |
 | **Requires** | `markdown`, `pygments`, `weasyprint` **plus system GTK libraries** |
 | **Runtime** | about 7 seconds |
 
@@ -306,7 +306,8 @@ print(result.model)             # the fitted model
 print(result.inliers)           # boolean mask over your data
 print(result.inlier_ratio)      # fraction of the data that agreed
 print(result.n_trials)          # how many hypotheses it actually needed
-print(result.residual_scale)    # robust sigma estimate from the inliers
+print(result.residual_scale)    # robust sigma of the inlier residuals (1.4826 * median)
+print(result.converged)         # False if max_trials stopped the loop
 ```
 
 ### Fitting a different model
@@ -334,9 +335,9 @@ result = ransac(data, fit_mymodel, mymodel_residuals,
 
 | Argument | Default | Meaning |
 |---|---|---|
-| `max_trials` | `10_000` | Hard cap. Always keep one. |
+| `max_trials` | `10_000` | Hard cap. Always keep one. `result.converged` is `False` if the cap, not the confidence target, stopped the loop. |
 | `confidence` | `0.99` | `p` — probability of drawing at least one uncontaminated sample. |
-| `score` | `"msac"` | `"msac"` (truncated L2) or `"ransac"` (inlier count). MSAC is ~3× more accurate when the threshold is imperfect. |
+| `score` | `"msac"` | `"msac"` (truncated L2) or `"ransac"` (inlier count). MSAC gives ~2.5× lower mean error when the threshold is badly set (§5.4). |
 | `is_sample_valid` | `None` | Cheap pre-check on a drawn sample, for your own degeneracy tests. |
 | `rng` | `None` | Seed or `np.random.Generator`, for reproducible runs. |
 
@@ -394,7 +395,8 @@ Or skip it entirely and print `index.html` to PDF from your browser.
 
 Already configured — `index.html` sits at the repository root and is self-contained.
 
-Settings → Pages → Source: **Deploy from a branch** → branch `main`, folder `/ (root)`.
+Settings → Pages → Source: **Deploy from a branch** → branch `master` (this repository's default
+branch), folder `/ (root)`.
 
 - `.nojekyll` stops GitHub from running the files through Jekyll. It is empty on purpose. If your
   download tool skipped it (it is a hidden, zero-byte file), recreate it with `type nul > .nojekyll`

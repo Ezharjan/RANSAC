@@ -18,7 +18,7 @@ SRC = HERE / "RANSAC_Tutorial.md"
 PNG = HERE / "ransac_figures.png"
 OUT = HERE / "index.html"        # named for GitHub Pages; rename freely
 
-text = SRC.read_text()
+text = SRC.read_text(encoding="utf-8")   # explicit: Windows defaults to cp1252
 
 # ------------------------------------------------------------------ figure
 text = text.replace(
@@ -26,11 +26,6 @@ text = text.replace(
     "(ransac_figures.png)",
     '<p class="fig"><img alt="Figure 1 — RANSAC: what it does, how long it '
     f'takes, and how to tune it" src="{figure_data_uri(PNG)}"></p>',
-)
-text = text.replace(
-    "Figure 1 ships alongside this document as\n`ransac_figures.png`, and §4.4 "
-    "contains the script that regenerates it.",
-    "Figure 1 is embedded below, and §4.4 contains the script that regenerates it.",
 )
 
 # ------------------------------------------------- shield mermaid + math
@@ -60,6 +55,8 @@ text = re.sub(r"\$\$.+?\$\$",
 
 # let the solutions block contain markdown
 text = text.replace("<details>", '<details markdown="1">')
+# ...and the closing summary box
+text = text.replace('<div align="center">', '<div align="center" markdown="1">')
 
 # ------------------------------------------------------------------ render
 body = markdown.markdown(
@@ -185,9 +182,9 @@ td code,th code{white-space:normal}
 .dia-taxonomy{padding-bottom:.4rem}
 .dia-taxonomy svg{max-width:none; min-width:900px}
 @media (min-width:1100px){ .dia-taxonomy svg{min-width:0; max-width:100%} }
-/* Graphviz emits black strokes/text; retint them for dark mode */
+/* Graphviz draws dark text on light node fills, so in dark mode the diagrams
+   sit on a light panel of their own (keeping the text dark and readable) */
 @media (prefers-color-scheme: dark){
-  :root:not([data-theme="light"]) .dia svg text{fill:#e6e3de}
   :root:not([data-theme="light"]) .dia{background:#f7f6f3; border-radius:8px; padding:.7rem 0}
 }
 :root[data-theme="dark"] .dia{background:#f7f6f3; border-radius:8px; padding:.7rem 0}
@@ -214,6 +211,8 @@ HTML = f"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="A complete, verified tutorial on RANSAC (RANdom SAmple Consensus): theory, mathematics, a from-scratch implementation, libraries, failure modes and modern variants.">
+<meta name="color-scheme" content="light dark">
 <title>RANSAC — From Greenhand to Expert</title>
 <style>
 {CSS}
@@ -241,7 +240,7 @@ document.querySelectorAll('table').forEach(function (t) {{
 </html>
 """
 
-OUT.write_text(HTML)
+OUT.write_text(HTML, encoding="utf-8", newline="\n")
 print("wrote", OUT, OUT.stat().st_size // 1024, "KB")
 print("diagrams embedded:", HTML.count('class="dia '))
 print("tables:", HTML.count("<table>"))

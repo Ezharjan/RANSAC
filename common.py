@@ -48,26 +48,26 @@ def frac(num: str, den: str) -> str:
 # renderer, so they work offline and on GitHub Pages with no CDN.
 MATH = [
     # 4.1
-    'P(sample is all-inlier) &nbsp;=&nbsp; <i>w</i><sup>s</sup>',
+    'P(sample is all-inlier) &nbsp;=&nbsp; <i>w</i><sup><i>s</i></sup>',
 
     # 4.2 derivation
-    '1 &minus; (1 &minus; <i>w</i><sup>s</sup>)<sup>N</sup> &nbsp;&ge;&nbsp; <i>p</i>'
+    '1 &minus; (1 &minus; <i>w</i><sup><i>s</i></sup>)<sup>N</sup> &nbsp;&ge;&nbsp; <i>p</i>'
     '&nbsp;&nbsp;&nbsp;&hArr;&nbsp;&nbsp;&nbsp;'
-    '(1 &minus; <i>w</i><sup>s</sup>)<sup>N</sup> &nbsp;&le;&nbsp; 1 &minus; <i>p</i>',
+    '(1 &minus; <i>w</i><sup><i>s</i></sup>)<sup>N</sup> &nbsp;&le;&nbsp; 1 &minus; <i>p</i>',
 
     # 4.2 the boxed result
     '<span class="boxed"><i>N</i> &nbsp;&ge;&nbsp; '
-    + frac('log(1 &minus; <i>p</i>)', 'log(1 &minus; <i>w</i><sup>s</sup>)')
+    + frac('log(1 &minus; <i>p</i>)', 'log(1 &minus; <i>w</i><sup><i>s</i></sup>)')
     + '</span>',
 
     # 4.5 hypergeometric probability
     'P(clean) &nbsp;=&nbsp; ' + frac('C(<i>I</i>, <i>s</i>)', 'C(<i>n</i>, <i>s</i>)')
     + ' &nbsp;=&nbsp; <span class="bigop">&prod;</span>'
-      '<sub class="lim">j=0</sub><sup class="lim">s&minus;1</sup> '
+      '<sub class="lim"><i>j</i>=0</sub><sup class="lim"><i>s</i><sup class="lim">s&minus;1</sup>minus;1</sup> '
     + frac('<i>I</i> &minus; <i>j</i>', '<i>n</i> &minus; <i>j</i>'),
 
     # 4.5 first-order correction
-    frac('P(clean)', '<i>w</i><sup>s</sup>') + ' &nbsp;&asymp;&nbsp; 1 &minus; '
+    frac('P(clean)', '<i>w</i><sup><i>s</i></sup>') + ' &nbsp;&asymp;&nbsp; 1 &minus; '
     + frac('<i>s</i>(<i>s</i> &minus; 1)(1 &minus; <i>w</i>)', '2 <i>w n</i>'),
 
     # 4.9 cost model

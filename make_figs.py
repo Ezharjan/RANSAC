@@ -1,3 +1,9 @@
+"""Regenerate Figure 1 (ransac_figures.png) of the RANSAC tutorial.
+
+Panels: (A) RANSAC vs least squares at 40 % outliers, (B) required trials vs
+inlier ratio, (C) threshold sweep over 40 runs, (D) adaptive termination.
+Usage:  python make_figs.py        (needs numpy + matplotlib, ~3 s)
+"""
 import math
 import pathlib
 
@@ -70,9 +76,9 @@ def ransac_trace(data, min_samples, thr, max_trials, seed, conf=0.99):
                 if k > best[1].sum() or (k == best[1].sum() and sc < best[2]):
                     best = (m, inl, sc)
                     w = k / n
-                    N_needed = math.ceil(
-                        math.log(1 - conf) / math.log(max(1e-12, 1 - w ** min_samples))
-                    )
+                    q = min(w ** min_samples, 1 - 1e-12)
+                    # log1p stays accurate (and non-zero) for tiny q
+                    N_needed = math.ceil(math.log(1 - conf) / math.log1p(-q))
         trace.append((int(best[1].sum()), min(N_needed, max_trials)))
     m, inl, _ = best
     if inl.sum() >= min_samples:
@@ -194,11 +200,11 @@ axb = ax.twinx()
 axb.step(t, trace[:, 1], where="post", color=OUTLIER, lw=2.0, ls="--",
          label="$N$ re-estimated from current $w$")
 axb.set_yscale("log")
-axb.set_ylabel("remaining trials budget $N$", color=OUTLIER)
+axb.set_ylabel("trial budget $N$  (log scale)", color=OUTLIER)
 axb.tick_params(axis="y", colors=OUTLIER)
 axb.grid(False)
 axb.axhline(len(trace), color="#666", lw=0.9, ls=":")
-axb.text(len(trace) * 0.30, len(trace) * 1.6,
+axb.text(len(trace) * 0.55, len(trace) * 1.6,
          f"stopped after {len(trace)} trials", fontsize=8, color="#444")
 ax.set_title("D · Adaptive stopping: the budget collapses as $w$ is learned")
 h1, l1 = ax.get_legend_handles_labels()

@@ -7,7 +7,7 @@ numpy>=1.24
 matplotlib>=3.6
 
 # PDF output only (build_pdf.py).
-# Needs GTK/Pango/Cairo system libraries -- see "Platform notes" in README.md.
+# Needs GTK/Pango/Cairo system libraries -- see "Installing the prerequisites" in README.md.
 # Skip it and print index.html from your browser if you prefer.
 weasyprint>=60
 

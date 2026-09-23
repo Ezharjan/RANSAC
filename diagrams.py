@@ -1,4 +1,8 @@
-"""Render the three tutorial flowcharts to SVG with Graphviz (for the PDF build)."""
+"""Render the three tutorial flowcharts to SVG with Graphviz.
+
+The SVGs are embedded by both build_page.py and build_pdf.py.
+Usage:  python diagrams.py      (needs Graphviz: the `dot` command on PATH)
+"""
 import subprocess, pathlib
 
 HERE = pathlib.Path(__file__).resolve().parent   # works from any folder, any OS
@@ -8,7 +12,7 @@ BLUE_F, GREEN_F, RED_F, PURPLE_F = "#e8f0f8", "#eaf5ec", "#fdeeea", "#f4eef8"
 
 LOOP = f'''
 digraph ransac_loop {{
-  rankdir=TB; bgcolor="transparent"; splines=ortho; nodesep=0.35; ranksep=0.40;
+  rankdir=TB; bgcolor="transparent"; nodesep=0.45; ranksep=0.40;
   node [shape=box style="rounded,filled" fontname="Helvetica" fontsize=11
         fillcolor="white" color="#3a3a3a" penwidth=1.2 margin="0.16,0.09"];
   edge [fontname="Helvetica" fontsize=9 color="#555555" arrowsize=0.7];
@@ -17,11 +21,11 @@ digraph ransac_loop {{
   B [label="Draw minimal sample\\ns points, uniformly at random"];
   C [label="Minimal solver\\nfit hypothesis θ" fillcolor="{GREEN_F}" color="{GREEN}" penwidth=2];
   D [label="Sample\\ndegenerate?" shape=diamond style=filled fillcolor="white" height=0.8];
-  E [label="Compute residuals rᵢ\\nfor all n points"];
-  F [label="Consensus set I\\n= points with rᵢ < t" fillcolor="{GREEN_F}" color="{GREEN}" penwidth=2];
+  E [label="Compute residuals r_i\\nfor all n points"];
+  F [label="Consensus set I\\n= points with r_i < t" fillcolor="{GREEN_F}" color="{GREEN}" penwidth=2];
   G [label="Score better than\\nbest so far?" shape=diamond style=filled fillcolor="white" height=0.9];
   H [label="Store θ, I as best"];
-  I [label="Re-estimate w = |I| / n\\nshrink N = log(1−p) / log(1−wˢ)"
+  I [label="Re-estimate w = |I| / n\\nshrink N = log(1−p) / log(1−w^s)"
      fillcolor="{RED_F}" color="{RED}" penwidth=2];
   J [label="Trial budget N\\nexhausted?" shape=diamond style=filled fillcolor="white" height=0.85];
   K [label="POLISH: refit on ALL inliers\\nwith the non-minimal solver"
@@ -86,7 +90,7 @@ digraph taxonomy {{
   Q1 [label="MSAC\\ntruncated L2"];
   Q2 [label="MLESAC\\nlikelihood"];
   Q3 [label="MAGSAC · MAGSAC++\\nmarginalise over σ"];
-  V1 [label="T(d,d) test"];
+  V1 [label="T(d,d) pre-test"];
   V2 [label="SPRT\\noptimal randomised"];
   V3 [label="Preemptive RANSAC\\nbounded time"];
   L1 [label="LO-RANSAC · LO+-RANSAC"];
@@ -111,11 +115,14 @@ digraph taxonomy {{
 
 def render(dot_src, name):
     out = HERE / f"dia_{name}.svg"
-    r = subprocess.run(["dot", "-Tsvg"], input=dot_src, capture_output=True, text=True)
+    # explicit UTF-8: the labels contain θ, σ, − and ·, which the default
+    # Windows code page cannot encode
+    r = subprocess.run(["dot", "-Tsvg"], input=dot_src, capture_output=True,
+                       text=True, encoding="utf-8")
     if r.returncode != 0:
         raise RuntimeError(r.stderr)
     svg = r.stdout[r.stdout.index("<svg"):]          # drop the XML/DOCTYPE preamble
-    out.write_text(svg)
+    out.write_text(svg, encoding="utf-8")
     return out, len(svg)
 
 

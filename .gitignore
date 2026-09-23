@@ -1,5 +1,5 @@
 # ---- build intermediates -------------------------------------------------
-# Written by build_pdf.py on its way to the PDF; not needed in the repo.
+# Intermediate written by older versions of build_pdf.py; never commit it.
 _print.html
 
 # Keep these tracked on purpose, so a clone can rebuild index.html

@@ -31,12 +31,8 @@ def stash(html):
 text = text.replace(
     "![Figure 1 — RANSAC: what it does, how long it takes, and how to tune it]"
     "(ransac_figures.png)",
-    stash(f'<div class="fig"><img src="{figure_data_uri(PNG)}"></div>'),
-)
-text = text.replace(
-    "Figure 1\nships alongside this document as\n`ransac_figures.png`, and §4.4 contains "
-    "the script that regenerates it.",
-    "Figure 1 is\nembedded below, and §4.4 contains the script that regenerates it.",
+    stash('<div class="fig"><img alt="Figure 1 — RANSAC: what it does, how long it '
+          f'takes, and how to tune it" src="{figure_data_uri(PNG)}"></div>'),
 )
 
 # mermaid -> pre-rendered Graphviz SVG, in document order
@@ -53,11 +49,14 @@ text = re.sub(r"\$\$.+?\$\$",
               lambda m: stash(f'<div class="math">{next(_m)}</div>'),
               text, flags=re.S)
 text = text.replace("<details>", '<details markdown="1" open>')
+text = text.replace('<div align="center">', '<div align="center" markdown="1">')
 
 body = markdown.markdown(
     text,
-    extensions=["extra", "tables", "fenced_code", "codehilite", "sane_lists"],
-    extension_configs={"codehilite": {"guess_lang": False}},
+    # "toc" gives every heading an id, so the §-links inside the PDF resolve
+    extensions=["extra", "tables", "fenced_code", "codehilite", "toc", "sane_lists"],
+    extension_configs={"codehilite": {"guess_lang": False},
+                       "toc": {"permalink": False}},
 )
 for k, v in vault.items():
     body = body.replace(f"<p>{k}</p>", v).replace(k, v)
@@ -144,6 +143,5 @@ html = f"""<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
 {HtmlFormatter(style="friendly").get_style_defs(".codehilite")}</style>
 </head><body>{body}</body></html>"""
 
-(HERE / "_print.html").write_text(html, encoding="utf-8")
 HTML(string=html, base_url=str(HERE)).write_pdf(str(OUT))
 print("wrote", OUT, OUT.stat().st_size // 1024, "KB")

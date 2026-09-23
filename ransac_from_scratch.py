@@ -21,7 +21,7 @@ class RansacResult:
     n_trials: int
     inlier_ratio: float
     residual_scale: float                    # robust sigma estimate
-    converged: bool = field(default=True)
+    converged: bool = field(default=True)   # confidence reached within cap
 
 
 def ransac(
@@ -63,13 +63,15 @@ def ransac(
         raise ValueError(f"need >= {min_samples} data points, got {n}")
     if score not in ("ransac", "msac"):
         raise ValueError("score must be 'ransac' or 'msac'")
+    if not 0.0 < confidence < 1.0:
+        raise ValueError("confidence must lie strictly between 0 and 1")
 
     t2 = threshold * threshold
     best_model = None
     best_inliers = np.zeros(n, dtype=bool)
     best_score = -np.inf
     trials = 0
-    budget = max_trials
+    budget = math.inf                        # adaptive N; shrinks as w is learned
 
     while trials < min(budget, max_trials):
         trials += 1
@@ -105,9 +107,8 @@ def ransac(
             best_model, best_inliers, best_score = model, inliers, current
 
             # ---------- 4. ADAPTIVE TERMINATION -------------------------
-            w = n_in / n
-            denom = math.log(max(1e-12, 1.0 - w ** min_samples))
-            budget = min(budget, math.ceil(math.log(1.0 - confidence) / denom))
+            budget = min(budget, _trials_needed(n_in / n, min_samples,
+                                                confidence))
 
     if best_model is None:
         return RansacResult(None, best_inliers, trials, 0.0, float("nan"),
@@ -123,9 +124,13 @@ def ransac(
             if new_inliers.sum() >= best_inliers.sum():
                 best_model, best_inliers = polished, new_inliers
 
+    # Robust noise scale. The residuals are unsigned distances of zero-mean
+    # errors, so median(|r|) = 0.6745 sigma for a Gaussian with one degree of
+    # freedom (codimension 1: lines, planes, circles). Taking the MAD of |r|
+    # around its own median would under-estimate sigma by ~40 %.
     final_res = np.asarray(residuals(best_model, data), dtype=float)
     inlier_res = final_res[best_inliers]
-    sigma = 1.4826 * float(np.median(np.abs(inlier_res - np.median(inlier_res)))) \
+    sigma = 1.4826 * float(np.median(inlier_res)) \
         if inlier_res.size else float("nan")
 
     return RansacResult(
@@ -134,7 +139,23 @@ def ransac(
         n_trials=trials,
         inlier_ratio=float(best_inliers.mean()),
         residual_scale=sigma,
+        converged=budget <= max_trials,     # False: stopped by the hard cap
     )
+
+
+def _trials_needed(w, s, confidence):
+    """N = ceil(log(1-p) / log(1-w^s)), computed stably for tiny w^s."""
+    q = w ** s
+    if q >= 1.0:
+        return 1
+    if q <= 0.0:
+        return math.inf
+    # log1p keeps precision when q is tiny; plain log(1 - q) rounds to 0
+    # (division by zero) once q drops below ~1e-16.
+    denom = math.log1p(-q)
+    if denom == 0.0:
+        return math.inf
+    return math.ceil(math.log(1.0 - confidence) / denom)
 
 
 # ======================================================================
@@ -171,11 +192,14 @@ def fit_circle(pts):
     pts = np.asarray(pts, float)
     x, y = pts[:, 0], pts[:, 1]
     A = np.column_stack([x, y, np.ones(len(pts))])
+    sv = np.linalg.svd(A, compute_uv=False)
+    if len(pts) < 3 or sv[-1] <= 1e-9 * sv[0]:   # collinear/coincident sample
+        return None
     b = x * x + y * y
     sol, *_ = np.linalg.lstsq(A, b, rcond=None)
     cx, cy = sol[0] / 2.0, sol[1] / 2.0
     disc = sol[2] + cx * cx + cy * cy
-    if disc <= 0:                             # collinear sample
+    if disc <= 0:
         return None
     return cx, cy, math.sqrt(disc)
 
@@ -220,21 +244,23 @@ if __name__ == "__main__":
     ])
     truth = np.r_[np.ones(NI, bool), np.zeros(NO, bool)]
 
+    PAD = " " * 14                             # indent for continuation lines
     for mode in ("ransac", "msac"):
         r = ransac(pts, fit_line, line_residuals, 2, 3 * SIG,
                    refit=fit_line, score=mode, rng=7)
         sl, ic = line_to_slope_intercept(r.model)
         tp = int((r.inliers & truth).sum())
         print(f"LINE [{mode:6s}] slope={sl:+.4f} (true {M:+.4f})  "
-              f"intercept={ic:+.4f} (true {B:+.4f})  trials={r.n_trials:3d}  "
-              f"inliers={int(r.inliers.sum()):3d}  "
+              f"intercept={ic:+.4f} (true {B:+.4f})  trials={r.n_trials:3d}")
+        print(f"{PAD}inliers={int(r.inliers.sum()):3d}  "
               f"precision={tp / max(1, r.inliers.sum()):.3f}  "
               f"recall={tp / truth.sum():.3f}  sigma_hat={r.residual_scale:.3f}")
 
     A = np.column_stack([pts[:, 0], np.ones(len(pts))])
     ols = np.linalg.lstsq(A, pts[:, 1], rcond=None)[0]
     print(f"LINE [OLS   ] slope={ols[0]:+.4f} (true {M:+.4f})  "
-          f"intercept={ols[1]:+.4f} (true {B:+.4f})   <-- destroyed by outliers")
+          f"intercept={ols[1]:+.4f} (true {B:+.4f})")
+    print(f"{PAD}<-- destroyed by outliers")
 
     # ---------- circle, 50 % outliers ---------------------------------
     CX, CY, R = 3.0, -2.0, 5.0
@@ -246,9 +272,10 @@ if __name__ == "__main__":
     ])
     rc = ransac(cpts, fit_circle, circle_residuals, 3, 0.3,
                 refit=fit_circle, rng=1)
-    print(f"CIRCLE       centre=({rc.model[0]:+.3f},{rc.model[1]:+.3f}) "
-          f"r={rc.model[2]:.3f}  (true ({CX:+.1f},{CY:+.1f}) r={R:.1f})  "
-          f"trials={rc.n_trials}  inliers={int(rc.inliers.sum())}")
+    print()
+    print(f"CIRCLE        centre=({rc.model[0]:+.3f},{rc.model[1]:+.3f}) "
+          f"r={rc.model[2]:.3f}  (true ({CX:+.1f},{CY:+.1f}) r={R:.1f})")
+    print(f"{PAD}trials={rc.n_trials}   inliers={int(rc.inliers.sum())}")
 
     # ---------- plane, 60 % outliers ----------------------------------
     n_true = np.array([0.2, -0.3, 1.0]); n_true /= np.linalg.norm(n_true)
@@ -262,7 +289,9 @@ if __name__ == "__main__":
     nn, dd = rp.model
     if nn @ n_true < 0:
         nn, dd = -nn, -dd                     # fix sign ambiguity
-    print(f"PLANE        normal={np.round(nn, 3)} d={dd:+.3f}  "
-          f"(true {np.round(n_true, 3)} d={d_true:+.3f})  "
-          f"angle_err={math.degrees(math.acos(min(1, abs(nn @ n_true)))):.3f} deg  "
-          f"trials={rp.n_trials}  inliers={int(rp.inliers.sum())}")
+    vec = lambda v: "[" + " ".join(f"{c:.3f}" for c in v) + "]"
+    print()
+    print(f"PLANE         normal={vec(nn)} d={dd:+.3f}  "
+          f"(true {vec(n_true)} d={d_true:+.3f})")
+    print(f"{PAD}angle_err={math.degrees(math.acos(min(1, abs(nn @ n_true)))):.3f} deg"
+          f"   trials={rp.n_trials}   inliers={int(rp.inliers.sum())}")
